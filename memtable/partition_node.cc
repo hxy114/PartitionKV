@@ -8,6 +8,10 @@
 #include "db/db_impl/db_impl.h"
 #include "logging/logging.h"
 namespace  rocksdb{
+extern uint64_t insert_data_time;
+extern uint64_t insert_index_time;
+extern uint64_t split_merge_time;
+extern uint64_t wait_compaction_time;
 PartitionNode::PartitionNode(const std::string &start_key1,
                              const std::string &end_key1,
                              MetaNode *metaNode1,
@@ -288,6 +292,7 @@ PartitionNode::MyStatus PartitionNode::Add(SequenceNumber s, ValueType type, con
     ROCKS_LOG_INFO(dbImpl_->immutable_db_options().logger,"immu_number long :%zu,num_run_flush:%d",immu_number_, dbImpl_->num_running_flushes_);
     //Log(dbImpl_->options_.info_log,"immu_number long :%zu",immu_number_);
     dbImpl_->env_->SleepForMicroseconds(500);
+    wait_compaction_time +=500;
   }
   Status ret=pmtable->Add(s,type,key,value,kv_prot_info,allow_concurrent,post_process_info,hint);
   if(ret.IsNvmNoSpace()){
@@ -338,7 +343,9 @@ PartitionNode::MyStatus PartitionNode::Add(SequenceNumber s, ValueType type, con
       while((pmlog=nvmManager->get_pm_log())== nullptr){
         ROCKS_LOG_INFO(dbImpl_->immutable_db_options().logger,"no pm log");
         //Log(dbImpl_->options_.info_log,"no pm log");
+        uint64_t  start_time =dbImpl_->env_->NowMicros();
         background_work_finished_signal_L0_.Wait();
+        wait_compaction_time += dbImpl_->env_->NowMicros() - start_time;
       }
       MemTable *newPmTable=cfd_->ConstructNewMemtable(*cfd_->GetLatestMutableCFOptions(),s,this,pmlog);
       //MemTable *newPmTable=new MemTable(internal_comparator_,this,pmlog);
@@ -350,6 +357,7 @@ PartitionNode::MyStatus PartitionNode::Add(SequenceNumber s, ValueType type, con
       pmtable->Add(s,type,key,value,kv_prot_info,allow_concurrent,post_process_info,hint);
       return sucess;
     }else{
+      uint64_t  cover_time = dbImpl_->env_->NowMicros();
       MyStatus status=sucess;
       auto current=versions_->column_family_set_->GetDefault()->current();
       bool has_other_immupmtable= other_immuPmtable != nullptr;
@@ -372,7 +380,7 @@ PartitionNode::MyStatus PartitionNode::Add(SequenceNumber s, ValueType type, con
         cover_[index_]=cover_size;
         index_=(index_+1)%K;
       }
-
+      split_merge_time+= dbImpl_->env_->NowMicros() - cover_time;
       if(!has_other_immupmtable){
         if(all_size<560&&capacity<AVG_PARTITION){
           if(capacity<MIN_PARTITION||cover_size>=SPLIT){
@@ -394,7 +402,9 @@ PartitionNode::MyStatus PartitionNode::Add(SequenceNumber s, ValueType type, con
               while((pmlog=nvmManager->get_pm_log())== nullptr){
                 ROCKS_LOG_INFO(dbImpl_->immutable_db_options().logger,"no pm log");
                 //Log(dbImpl_->options_.info_log,"no pm log");
+                uint64_t start_time = dbImpl_->env_->NowMicros();
                 background_work_finished_signal_L0_.Wait();
+                wait_compaction_time += dbImpl_->env_->NowMicros() - start_time;
               }
               MemTable *newPmTable=cfd_->ConstructNewMemtable(*cfd_->GetLatestMutableCFOptions(),s,this,pmlog);
               //MemTable *newPmTable=new MemTable(internal_comparator_,this,pmlog);
@@ -418,7 +428,9 @@ PartitionNode::MyStatus PartitionNode::Add(SequenceNumber s, ValueType type, con
             while((pmlog=nvmManager->get_pm_log())== nullptr){
               ROCKS_LOG_INFO(dbImpl_->immutable_db_options().logger,"no pm log");
               //Log(dbImpl_->options_.info_log,"no pm log");
+              uint64_t start_time = dbImpl_->env_->NowMicros();
               background_work_finished_signal_L0_.Wait();
+              wait_compaction_time += dbImpl_->env_->NowMicros() - start_time;
             }
             MemTable *newPmTable=cfd_->ConstructNewMemtable(*cfd_->GetLatestMutableCFOptions(),s,this,pmlog);
             //MemTable *newPmTable=new MemTable(internal_comparator_,this,pmlog);
@@ -445,7 +457,9 @@ PartitionNode::MyStatus PartitionNode::Add(SequenceNumber s, ValueType type, con
         while((pmlog=nvmManager->get_pm_log())== nullptr){
           ROCKS_LOG_INFO(dbImpl_->immutable_db_options().logger,"no pm log");
           //Log(dbImpl_->options_.info_log,"no pm log");
+          uint64_t start_time = dbImpl_->env_->NowMicros();
           background_work_finished_signal_L0_.Wait();
+          wait_compaction_time += dbImpl_->env_->NowMicros() - start_time;
         }
         MemTable *newPmTable=cfd_->ConstructNewMemtable(*cfd_->GetLatestMutableCFOptions(),s,this,pmlog);
         //MemTable *newPmTable=new MemTable(internal_comparator_,this,pmlog);

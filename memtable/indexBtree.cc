@@ -5,6 +5,11 @@
 #include "logging/logging.h"
 #include <iostream>
 namespace  rocksdb{
+extern uint64_t insert_data_time;
+extern uint64_t insert_index_time;
+extern uint64_t split_merge_time;
+extern uint64_t wait_compaction_time;
+extern uint64_t insert_total_time;
 PartitionIndexLayer::PartitionIndexLayer(VersionSet *const versions,
                                          CacheAlignedInstrumentedMutex &mutex,
                                          InstrumentedCondVar  &background_work_finished_signal_L0,
@@ -98,6 +103,7 @@ void PartitionIndexLayer::Add(SequenceNumber s, ValueType type, const Slice& key
       Log(dbImpl_->options_.info_log,"L1 big wait %ld",cost);
     }
   }*/
+  uint64_t total_time = dbImpl_->env_->NowMicros();
   if(nvmManager->get_free_pm_log_number()<=nvmManager->L0_wait_){
     //Log(dbImpl_->options_.info_log,"L0 wait,free_pm_log");
     //std::cout<<"capacity:"<<capacity_<<" nvmManager->get_free_pm_log_number():"<<nvmManager->get_free_pm_log_number()<<"nvmManager->L0_wait_"<<nvmManager->L0_wait_<<std::endl;
@@ -106,6 +112,7 @@ void PartitionIndexLayer::Add(SequenceNumber s, ValueType type, const Slice& key
     if(x){
 	x=false;
     dbImpl_->env_->SleepForMicroseconds(500);
+    wait_compaction_time +=500;
     }else{
 	  x=true;
     }
@@ -116,12 +123,17 @@ void PartitionIndexLayer::Add(SequenceNumber s, ValueType type, const Slice& key
 
     PartitionNode::MyStatus status=partition_node->Add(s,type,key,value,false,capacity_,kv_prot_info,allow_concurrent,post_process_info,hint);
     if(status==PartitionNode::MyStatus::sucess){
+    insert_total_time += dbImpl_->env_->NowMicros() - total_time;
       return;
     }else if(status==PartitionNode::MyStatus::split){
+      uint64_t  start_time =dbImpl_->env_->NowMicros();
       status=split(partition_node,s);
+      split_merge_time +=dbImpl_->env_->NowMicros() -start_time;
 
     }else if(status==PartitionNode::MyStatus::merge){
+      uint64_t  start_time =dbImpl_->env_->NowMicros();
       status=merge(partition_node);
+      split_merge_time +=dbImpl_->env_->NowMicros() -start_time;
     }
     if(status==PartitionNode::noop){
       mutex_.Lock();
@@ -129,7 +141,9 @@ void PartitionIndexLayer::Add(SequenceNumber s, ValueType type, const Slice& key
       while((pmlog=nvmManager->get_pm_log())== nullptr){
       ROCKS_LOG_INFO(dbImpl_->immutable_db_options().logger,"no pm log");
       //Log(dbImpl_->options_.info_log,"no pm log");
+      uint64_t  start_time =dbImpl_->env_->NowMicros();
       background_work_finished_signal_L0_.Wait();
+      wait_compaction_time +=dbImpl_->env_->NowMicros() - start_time;
       }
       MemTable *newPmTable=cfd_->ConstructNewMemtable(*cfd_->GetLatestMutableCFOptions(),s,partition_node,pmlog);
       //MemTable *newMemTable=new MemTable(internal_comparator_,*cfd_->GetLatestMutableCFOptions(),cfd_->partition_node,pmlog);
@@ -144,6 +158,7 @@ void PartitionIndexLayer::Add(SequenceNumber s, ValueType type, const Slice& key
     partition_node->Add(s,type,key,value,true,capacity_,kv_prot_info,allow_concurrent,post_process_info,hint);
 
     assert(partition_node->start_key<=partition_node->pmtable->GetMinKey() && partition_node->end_key>=partition_node->pmtable->GetMaxKey() &&partition_node->pmtable->GetMinKey()<=partition_node->pmtable->GetMaxKey() );
+    insert_total_time += dbImpl_->env_->NowMicros() - total_time;
 
 }
 PartitionNode * PartitionIndexLayer::getAceeptNode(Version *current,PartitionNode *partitionNode){

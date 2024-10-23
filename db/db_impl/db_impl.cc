@@ -4,7 +4,7 @@
 //  (found in the LICENSE.Apache file in the root directory).
 //
 // Copyright (c) 2011 The LevelDB Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
+// Use of this source code is governed by a BSD-~style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 #include "db/db_impl/db_impl.h"
 
@@ -115,6 +115,11 @@
 #include "utilities/trace/replayer_impl.h"
 
 namespace ROCKSDB_NAMESPACE {
+uint64_t insert_data_time =0;
+uint64_t insert_index_time = 0;
+uint64_t split_merge_time = 0;
+uint64_t wait_compaction_time = 0;
+uint64_t insert_total_time =0;
 
 const std::string kDefaultColumnFamilyName("default");
 const std::string kPersistentStatsColumnFamilyName(
@@ -752,6 +757,11 @@ DBImpl::~DBImpl() {
     closing_status_.PermitUncheckedError();
   }
   ThreadStatusUtil::SetThreadOperation(cur_op_type);
+  std::cout<<"insert_total_time::" << insert_total_time << std::endl;
+  std::cout<<"data_insert_time:"<<insert_data_time<<std::endl;
+  std::cout<<"index_insert_Time:" << insert_index_time<<std::endl;
+  std::cout<<"wait_compaction_time:" << wait_compaction_time << std::endl;
+  std::cout<<"split_merge_time:" << split_merge_time << std::endl;
 }
 
 void DBImpl::MaybeIgnoreError(Status* s) const {

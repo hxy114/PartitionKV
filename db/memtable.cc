@@ -46,7 +46,10 @@
 #include "util/mutexlock.h"
 
 namespace ROCKSDB_NAMESPACE {
-
+extern uint64_t insert_data_time;
+extern uint64_t insert_index_time;
+extern uint64_t split_merge_time;
+extern uint64_t wait_compaction_time;
 ImmutableMemTableOptions::ImmutableMemTableOptions(
     const ImmutableOptions& ioptions,
     const MutableCFOptions& mutable_cf_options)
@@ -935,6 +938,12 @@ void MemTable::UpdateEntryChecksum(const ProtectionInfoKVOS64* kv_prot_info,
   }
 }
 
+uint64_t NowMicros()  {
+  port::TimeVal tv;
+  port::GetTimeOfDay(&tv, nullptr);
+  return static_cast<uint64_t>(tv.tv_sec) * 1000000 + tv.tv_usec;
+}
+
 Status MemTable::Add(SequenceNumber s, ValueType type,
                      const Slice& key, /* user key */
                      const Slice& value,
@@ -964,6 +973,7 @@ Status MemTable::Add(SequenceNumber s, ValueType type,
   }
   std::unique_ptr<MemTableRep>& table =
       type == kTypeRangeDeletion ? range_del_table_ : table_;
+  uint64_t  start_time =NowMicros();
   KeyHandle handle = table->Allocate(encoded_len, &buf1);
   //printf("buf1:%p \n", buf1);
   //uint64_t a = reinterpret_cast<uint64_t >(buf1);
@@ -979,6 +989,7 @@ Status MemTable::Add(SequenceNumber s, ValueType type,
   p += 8;
   p = EncodeVarint32(p, val_size);
   memcpy(p, value.data(), val_size);
+  insert_data_time += NowMicros() - start_time;
   assert((unsigned)(p + val_size - buf + moptions_.protection_bytes_per_key) ==
          (unsigned)encoded_len);
 
@@ -994,7 +1005,6 @@ Status MemTable::Add(SequenceNumber s, ValueType type,
   }
 
   Slice key_without_ts = StripTimestampFromUserKey(key, ts_sz_);
-
   if (!allow_concurrent) {
     // Extract prefix for insert with hint. Hints are for point key table
     // (`table_`) only, not `range_del_table_`.
@@ -1006,7 +1016,9 @@ Status MemTable::Add(SequenceNumber s, ValueType type,
         return Status::TryAgain("key+seq exists");
       }
     } else {
+      start_time = NowMicros();
       bool res = table->InsertKey(handle);
+      insert_index_time += NowMicros() - start_time;
       if (UNLIKELY(!res)) {
         return Status::TryAgain("key+seq exists");
       }

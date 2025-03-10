@@ -24,15 +24,13 @@ const std::string MIN_KEY="";
 const std::string MAX_KEY="\xFF\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff";
 
 
-const uint64_t PRE_SPLIT=10;//TODO
+
 const uint64_t SPLIT=10;//TODO
 
-const uint64_t PRE_MERGE=4;//TODO
+
 const uint64_t MERGE=4;//TODO
 
-const uint64_t K=7;//TODO 记录K次覆盖记录
-const uint64_t PRE_SPLIT_NUMBER=3;//TODO
-const uint64_t PRE_MERGE_NUMBER=3;//TODO
+
 
 
 const uint64_t MIN_PARTITION=20;
@@ -46,8 +44,7 @@ const uint64_t L0_THREAD_NUMBER=3;
 
 const double NEW_SPLIT=1.0/60*2;
 const double NEW_MERGE=1.0/60/2;
-//const int extra_pm_log_const=20;
-//int extra_pm_log=extra_pm_log_const;
+
 
 MetaNode * NvmManager::get_meta_node() {
   mutex_.Lock();

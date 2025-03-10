@@ -386,7 +386,7 @@ Status CompactionL0Outputs::AddToOutput(
       range_tombstone_lower_bound_.Clear();
     }
   }
-  if (HasVwriter()&&vWriter_->FileSize() >=68157440ULL) {
+  if (HasVwriter()&&vWriter_->FileSize() >=2147483648ULL) {
     close_log_file_func(*this);
   }
 

@@ -44,8 +44,8 @@ class PartitionNode{
   size_t immu_number_;
   ColumnFamilyData *cfd_;
  public:
-  void reset_cover();
-  MyStatus needSplitOrMerge();
+//  void reset_cover();
+//  MyStatus needSplitOrMerge();
   MyStatus needSplitOrMerge(size_t all_size,size_t cover_size);
   void init(const std::string &startkey,const std::string &endkey);
   void FLush();

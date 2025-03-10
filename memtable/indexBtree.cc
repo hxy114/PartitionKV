@@ -346,7 +346,7 @@ PartitionNode::MyStatus PartitionIndexLayer::split(PartitionNode *partitionNode,
         add_new_partition(newPartitionNode);
 
         partitionNode->set_range(splitKey,partitionNode->end_key);
-        partitionNode->reset_cover();
+        //partitionNode->reset_cover();
         partitionNode->reset_immuPmtable();
         MemTable *pmTable2=cfd_->ConstructNewMemtable(*cfd_->GetLatestMutableCFOptions(),s,partitionNode,pmLogHead2);
         //MemTable *pmTable2=new MemTable(internal_comparator_,partitionNode,pmLogHead2);

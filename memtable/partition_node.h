@@ -33,8 +33,8 @@ class PartitionNode{
   VersionSet *const versions_;
   InternalKeyComparator internal_comparator_;
 
-  std::vector<uint64_t>cover_;
-  size_t index_=0;
+  //std::vector<uint64_t>cover_;
+  //size_t index_=0;
 
   InstrumentedCondVar  &background_work_finished_signal_L0_;
   PmtableQueue &top_queue_;
@@ -44,8 +44,8 @@ class PartitionNode{
   size_t immu_number_;
   ColumnFamilyData *cfd_;
  public:
-  void reset_cover();
-  MyStatus needSplitOrMerge();
+  //void reset_cover();
+  //MyStatus needSplitOrMerge();
   MyStatus needSplitOrMerge(size_t all_size,size_t cover_size);
   void init(const std::string &startkey,const std::string &endkey);
   void FLush();

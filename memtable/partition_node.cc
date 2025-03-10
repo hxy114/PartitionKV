@@ -374,15 +374,15 @@ PartitionNode::MyStatus PartitionNode::Add(SequenceNumber s, ValueType type, con
       }
 
 
-      if(cover_.size()<K){
-        cover_.push_back(cover_size);
-      }else{
-        cover_[index_]=cover_size;
-        index_=(index_+1)%K;
-      }
+//      if(cover_.size()<K){
+//        cover_.push_back(cover_size);
+//      }else{
+//        cover_[index_]=cover_size;
+//        index_=(index_+1)%K;
+//      }
       split_merge_time+= dbImpl_->env_->NowMicros() - cover_time;
       if(!has_other_immupmtable){
-        if(all_size<560&&capacity<AVG_PARTITION){
+        if(/*all_size<560&&*/capacity<AVG_PARTITION){
           if(capacity<MIN_PARTITION||cover_size>=SPLIT){
             status=split;
             mutex_.Lock();
@@ -395,8 +395,9 @@ PartitionNode::MyStatus PartitionNode::Add(SequenceNumber s, ValueType type, con
             current->Unref();
             mutex_.Unlock();
             return status;
-          }else{
-            if((status=needSplitOrMerge())==sucess){
+          }
+          else{
+            //if((status=needSplitOrMerge())==sucess){
               mutex_.Lock();
               PmLogHead *pmlog= nullptr;
               while((pmlog=nvmManager->get_pm_log())== nullptr){
@@ -415,8 +416,9 @@ PartitionNode::MyStatus PartitionNode::Add(SequenceNumber s, ValueType type, con
               FLush();
               pmtable->Add(s,type,key,value,kv_prot_info,allow_concurrent,post_process_info,hint);
               return sucess;
-            }
+            //}
           }
+
           mutex_.Lock();
           current->Unref();
           mutex_.Unlock();
@@ -488,30 +490,30 @@ PartitionNode::MyStatus PartitionNode::Add(SequenceNumber s, ValueType type, con
   return PartitionNode::MyStatus::sucess;
 
 }
-void PartitionNode::reset_cover(){
-  cover_.clear();
-  index_=0;
-}
-PartitionNode::MyStatus PartitionNode::needSplitOrMerge(){
-  MyStatus status=sucess;
-  size_t split_number=0,merge_number=0;
-  for(uint64_t i=0;i<cover_.size();i++){
-    if(cover_[i]>=PRE_SPLIT){
-      split_number++;
-    }else if(cover_[i]<=PRE_MERGE){
-      merge_number++;
-    }
-  }
-  if(split_number>=PRE_SPLIT_NUMBER){
-    status=split;
-    return status;
-  }
-  if(merge_number>=PRE_MERGE_NUMBER){
-    status=merge;
-    return status;
-  }
-  return status;
-}
+//void PartitionNode::reset_cover(){
+//  cover_.clear();
+//  index_=0;
+//}
+//PartitionNode::MyStatus PartitionNode::needSplitOrMerge(){
+//  MyStatus status=sucess;
+//  size_t split_number=0,merge_number=0;
+//  for(uint64_t i=0;i<cover_.size();i++){
+//    if(cover_[i]>=PRE_SPLIT){
+//      split_number++;
+//    }else if(cover_[i]<=PRE_MERGE){
+//      merge_number++;
+//    }
+//  }
+//  if(split_number>=PRE_SPLIT_NUMBER){
+//    status=split;
+//    return status;
+//  }
+//  if(merge_number>=PRE_MERGE_NUMBER){
+//    status=merge;
+//    return status;
+//  }
+//  return status;
+//}
 PartitionNode::MyStatus PartitionNode::needSplitOrMerge(size_t  all_size,size_t cover_size){
  /* Status status=sucess;
   size_t split_number=0,merge_number=0;

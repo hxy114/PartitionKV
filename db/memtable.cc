@@ -989,6 +989,9 @@ Status MemTable::Add(SequenceNumber s, ValueType type,
   p += 8;
   p = EncodeVarint32(p, val_size);
   memcpy(p, value.data(), val_size);
+  pmem_persist(buf,encoded_len);
+  pmLogHead_->used_size=nvmArena_.MemoryUsage();
+  pmem_persist(&(pmLogHead_->used_size),sizeof(pmLogHead_->used_size));//持久化使用量
   insert_data_time += NowMicros() - start_time;
   assert((unsigned)(p + val_size - buf + moptions_.protection_bytes_per_key) ==
          (unsigned)encoded_len);

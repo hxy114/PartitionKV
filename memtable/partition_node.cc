@@ -13,7 +13,7 @@ extern uint64_t insert_index_time;
 extern uint64_t split_merge_time;
 extern uint64_t wait_compaction_time;
 std::map<uint64_t,PartitionNode*>time_map;
-uint64_t time=0;
+uint64_t time_version=0;
 PartitionNode::PartitionNode(const std::string &start_key1,
                              const std::string &end_key1,
                              MetaNode *metaNode1,
@@ -193,12 +193,12 @@ void PartitionNode::set_pmtable(MemTable *pmTable){
   pmTable->Ref();
   pmtable=pmTable;
   metaNode->pm_log=(uint64_t)pmtable->pmLogHead_-(uint64_t)base_;
-  time++;
+  time_version++;
   if(time_map.count(time_)){
     time_map.erase(time_);
 
   }
-  time_=time++;
+  time_=time_version++;
   time_map[time_]=this;
   //pmem_drain();
 }

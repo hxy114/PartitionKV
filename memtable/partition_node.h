@@ -11,7 +11,7 @@ namespace rocksdb{
 class VersionSet;
 class DBImpl;
 extern std::map<uint64_t,PartitionNode*>time_map;
-extern uint64_t time;
+extern uint64_t time_version;
 class PartitionNode{
  public:
   enum MyStatus{

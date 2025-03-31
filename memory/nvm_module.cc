@@ -116,7 +116,7 @@ NvmManager::NvmManager (bool is_recover_){
       }
 
     }
-    L0_wait_=(free_pm_log_list_.size()-MAX_PARTITION)*0.3;
+    L0_wait_=5;
     L0_stop_=0;
 
 
@@ -132,7 +132,7 @@ NvmManager::NvmManager (bool is_recover_){
       reset(pm_log_head);
       free_pm_log_list_.emplace_back(pm_log_head);
     }
-    L0_wait_=(free_pm_log_list_.size()-MAX_PARTITION)*0.3;
+    L0_wait_=5;
     L0_stop_=0;
 
 

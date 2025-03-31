@@ -10,6 +10,8 @@
 namespace rocksdb{
 class VersionSet;
 class DBImpl;
+extern std::map<uint64_t,PartitionNode*>time_map;
+extern uint64_t time;
 class PartitionNode{
  public:
   enum MyStatus{
@@ -43,6 +45,7 @@ class PartitionNode{
   DBImpl *dbImpl_;
   size_t immu_number_;
   ColumnFamilyData *cfd_;
+  uint64_t time_;
  public:
   //void reset_cover();
   //MyStatus needSplitOrMerge();

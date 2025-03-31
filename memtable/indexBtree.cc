@@ -203,6 +203,94 @@ PartitionNode * PartitionIndexLayer::getAceeptNode(Version *current,PartitionNod
 
 
 }
+
+PartitionNode::MyStatus PartitionIndexLayer::merge1(PartitionNode *partitionNode){
+    //return  PartitionNode::noop;
+    if(capacity_>MIN_PARTITION){
+      mutex_.Lock();
+      assert(partitionNode->other_immuPmtable== nullptr&&partitionNode->pmtable== nullptr);
+      Version *current=versions_->column_family_set_->GetDefault()->current();
+      current->Ref();
+      mutex_.Unlock();
+      PartitionNode *acceptPartitionNode=getAceeptNode(current,partitionNode);
+      if(acceptPartitionNode!= nullptr){
+        ROCKS_LOG_INFO(dbImpl_->immutable_db_options().logger,"mergeing partitionNode:start:%s,end%s.acceptnode:start:%s,end:%s,capacity:%lu",
+                       partitionNode->start_key.c_str(), partitionNode->end_key.c_str(),
+                       acceptPartitionNode->start_key.c_str(),acceptPartitionNode->end_key.c_str(),capacity_);
+        /* Log(dbImpl_->options_.info_log, "mergeing partitionNode:start:%s,end%s.acceptnode:start:%s,end:%s,capacity:%d",
+             partitionNode->start_key.c_str(), partitionNode->end_key.c_str(),
+             acceptPartitionNode->start_key.c_str(),acceptPartitionNode->end_key.c_str(),capacity_);*/
+        std::string end_key=partitionNode->end_key;
+        std::string accept_end_key=acceptPartitionNode->end_key;
+        std::string new_start_key=std::min(partitionNode->start_key,acceptPartitionNode->start_key);
+        std::string new_end_key=std::max(partitionNode->end_key,acceptPartitionNode->end_key);
+
+        mutex_.Lock();
+        auto immupmTable = partitionNode->pmtable;
+        partitionNode->add_immuPmtable(immupmTable);
+        partitionNode->reset_pmtable();
+        immupmTable->role_=MemTable::immuPmtable;
+        if(immupmTable->status_==MemTable::IN_HEAD){
+          immupmTable->status_=MemTable::IN_LOW_QUQUE;
+          low_queue_.InsertPmtable(immupmTable);
+        }else if(partitionNode->immuPmtable->status_==MemTable::IN_LOW_QUQUE){
+          low_queue_.RemovePmtable(partitionNode->immuPmtable);
+          high_queue_.InsertPmtable(partitionNode->immuPmtable);
+          partitionNode->immuPmtable->status_=MemTable::IN_HIGH_QUEUE;
+        }/*else if(immuPmtable->status_==PmTable::IN_LOW_QUQUE){
+           low_queue_.RemovePmtable(immuPmtable);
+           top_queue_.InsertPmtable(immuPmtable);
+           immuPmtable->status_=PmTable::IN_TOP_QUEUE;
+         }*/
+
+        MemTable *immutable_list=partitionNode->immuPmtable;
+        if(immutable_list){
+          immutable_list->SetRole(MemTable::other_immuPmtable);
+          immutable_list->SetLeftFather(acceptPartitionNode);
+          if(immutable_list->status_==MemTable::IN_LOW_QUQUE){
+            low_queue_.RemovePmtable(immutable_list);
+            immutable_list->status_=MemTable::IN_TOP_QUEUE;
+            top_queue_.InsertPmtable(immutable_list);
+          }else if(immutable_list->status_==MemTable::IN_HIGH_QUEUE){
+            high_queue_.RemovePmtable(immutable_list);
+            immutable_list->status_=MemTable::IN_TOP_QUEUE;
+            top_queue_.InsertPmtable(immutable_list);
+          }
+          acceptPartitionNode->set_other_immupmtable(immutable_list);
+        }
+
+
+        acceptPartitionNode->set_range(new_start_key,new_end_key);
+
+
+        partitionNode->reset_immuPmtable();
+
+        remove_partition_by_key(end_key);
+        remove_partition_by_key(accept_end_key);
+        add_new_partition(acceptPartitionNode);
+
+        partitionNode->FreePartitionNode();
+        delete partitionNode;
+        acceptPartitionNode->FLush();
+        current->Unref();
+        mutex_.Unlock();
+        ROCKS_LOG_INFO(dbImpl_->immutable_db_options().logger,"mergeed new partition:start:%s ,end:%s,capacity:%lu",
+                       acceptPartitionNode->start_key.c_str(),acceptPartitionNode->end_key.c_str(),capacity_);
+        /*Log(dbImpl_->options_.info_log, "mergeed new partition:start:%s ,end:%s,capacity:%d",
+            acceptPartitionNode->start_key.c_str(),acceptPartitionNode->end_key.c_str(),capacity_);*/
+        return  PartitionNode::sucess;
+      }else{
+        mutex_.Lock();
+        current->Unref();
+        mutex_.Unlock();
+      }
+      return  PartitionNode::noop;
+
+    }
+    return  PartitionNode::noop;
+
+}
+
 PartitionNode::MyStatus PartitionIndexLayer::merge(PartitionNode *partitionNode){
     //return  PartitionNode::noop;
     if(capacity_>MIN_PARTITION){
@@ -279,6 +367,34 @@ PartitionNode::MyStatus PartitionIndexLayer::merge(PartitionNode *partitionNode)
 }*/
 PartitionNode::MyStatus PartitionIndexLayer::split(PartitionNode *partitionNode, SequenceNumber s){
     //return  PartitionNode::noop;
+    if(capacity_==MAX_PARTITION) {
+      mutex_.Lock();
+      auto current = versions_->column_family_set_->GetDefault()->current();
+      current->Ref();
+      mutex_.Unlock();
+      SequenceNumber max_snapshot = versions_->LastSequence(),
+                     min_snapshot = 0;
+      for (auto p : time_map) {
+        InternalKey start = InternalKey(p.second->start_key, max_snapshot,
+                                        ValueType::kTypeValue);
+        InternalKey end =
+            InternalKey(p.second->end_key, min_snapshot, ValueType::kTypeValue);
+        auto all_size = current->storage_info()->NumLevelFiles(1);
+        size_t cover_size = 0;
+        if (1 < current->storage_info()->num_non_empty_levels()) {
+          cover_size =
+              current->storage_info()->GetOverlappingSize(1, &start, &end);
+        }
+        bool has_other_immupmtable = p.second->other_immuPmtable != nullptr;
+        if (!has_other_immupmtable && p.second->needSplitOrMerge(all_size,cover_size)==PartitionNode::MyStatus::merge &&
+            merge1(p.second) == PartitionNode::sucess) {
+          break;
+        }
+      }
+      mutex_.Lock();
+      current->Unref();
+      mutex_.Unlock();
+    }
     if(capacity_<MAX_PARTITION){
       ROCKS_LOG_INFO(dbImpl_->immutable_db_options().logger,"spliting partitionNode:start:%s,end%s,caption:%lu",
                      partitionNode->start_key.c_str(), partitionNode->end_key.c_str(),capacity_);

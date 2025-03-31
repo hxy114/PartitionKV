@@ -30,7 +30,7 @@ class PartitionIndexLayer{
   PmtableQueue &low_queue_;
   uint64_t  capacity_;
   DBImpl *dbImpl_;
-
+  PartitionNode::MyStatus merge1(PartitionNode *partitionNode);
   PartitionNode::MyStatus merge(PartitionNode *partitionNode);
   PartitionNode::MyStatus split(PartitionNode *partitionNode,SequenceNumber s);
   //PartitionNode::MyStatus init_split(PartitionNode *partitionNode);

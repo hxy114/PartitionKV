@@ -12,6 +12,8 @@ extern uint64_t insert_data_time;
 extern uint64_t insert_index_time;
 extern uint64_t split_merge_time;
 extern uint64_t wait_compaction_time;
+std::map<uint64_t,PartitionNode*>time_map;
+uint64_t time=0;
 PartitionNode::PartitionNode(const std::string &start_key1,
                              const std::string &end_key1,
                              MetaNode *metaNode1,
@@ -39,7 +41,7 @@ PartitionNode::PartitionNode(const std::string &start_key1,
               low_queue_(low_queue),
               dbImpl_(dbImpl),
               immu_number_(0),
-              cfd_(cfd){
+              cfd_(cfd),time_(0){
   init(start_key1,end_key1);
 }
 
@@ -69,7 +71,7 @@ PartitionNode::PartitionNode(MetaNode *metaNode1,
       low_queue_(low_queue),
       dbImpl_(dbImpl),
       immu_number_(0),
-      cfd_(cfd){
+      cfd_(cfd),time_(0){
   start_key.assign(metaNode->start_key,metaNode->start_key_size);
   end_key.assign(metaNode->end_key,metaNode->end_key_size);
 
@@ -78,6 +80,9 @@ PartitionNode::PartitionNode(MetaNode *metaNode1,
 PartitionNode::~PartitionNode(){
   pmem_persist(metaNode,sizeof(MetaNode));
   nvmManager->free_meta_node(metaNode);
+  if(time_map.count(time_)){
+    time_map.erase(time_);
+  }
 
 }
 void PartitionNode::FreePartitionNode() {
@@ -188,6 +193,13 @@ void PartitionNode::set_pmtable(MemTable *pmTable){
   pmTable->Ref();
   pmtable=pmTable;
   metaNode->pm_log=(uint64_t)pmtable->pmLogHead_-(uint64_t)base_;
+  time++;
+  if(time_map.count(time_)){
+    time_map.erase(time_);
+
+  }
+  time_=time++;
+  time_map[time_]=this;
   //pmem_drain();
 }
 void PartitionNode::reset_other_immupmtable(int n,MemTable *pm){

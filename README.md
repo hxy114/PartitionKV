@@ -25,6 +25,6 @@ We only support Makefile instead of cmake currently.
 ### 2.4 Run
 We use db_bench for testing.
 ```
-./db_bench ----benchmarks= "fillrandom,stats,readrandom,stats" --dbname=/mnt/data_02/dbbench --max_background_flushes=5 --max_background_compactions=1 --target_file_size_base=16777216
+./db_bench ----benchmarks= "fillrandom,stats,readrandom,stats" --dbname=/mnt/data_02/dbbench --max_background_flushes=5 --max_background_compactions=1 --target_file_size_base=16777216 --max_bytes_for_level_base=8589934592
 ```
 
